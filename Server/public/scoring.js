@@ -47,7 +47,7 @@ var tallyScoreCSV = tallyScoreHeader;
             <td>${rawValue.student}</td>\
             <td>${rawValue.reviewer}</td>\
             <td>${rawValue.score}</td>\
-            <td>${rawValue._id.getTimestamp()}</td>\
+            <td>${rawValue.createdAt || "N/A"}</td>\
             </tr>`;
   });
   document.getElementById("raw").innerHTML += `<tbody>${tableBuffer}</tbody>`;
@@ -57,31 +57,44 @@ var tallyScoreCSV = tallyScoreHeader;
   downloadlink.download = `PeerEvaluations-${(new Date()).toISOString()}.csv`;
   downloadlink.hidden = false;
 
-  (await scores.aggregate([
-    {
-      "$group": {
-        "_id": "$class"
-      }
-    }
-  ])).sort().map(classObject => classObject._id).forEach(classString => {
-    var tallyScoreCSV = tallyScoreHeader;
+  const classStrings = [
+    ...new Set(tallyValues.map(tallyValue => tallyValue._id.class))
+  ].sort();
 
-    tallyValues.reverse().filter(tallyValue => tallyValue._id.class == classString).forEach(tallyValue => {
-      tallyValue.comment = tallyValue.comments.length > 0 ?
-        tallyValue.comments[0].comment.replaceAll('\n', ' ').replaceAll(/\s\s+/g, ' ') : "N/A";
-      tallyValue.submitted = tallyValue.scores.length > 0 ? "Y" : "N";
+  classStrings.forEach(classString => {
+    let classCSV = tallyScoreHeader;
 
-      tallyScoreCSV += `\n"${tallyValue._id.class}","${tallyValue._id.group}","${tallyValue._id.student.split("@")[0].split("_")[0]}","${tallyValue._id.student.split("@")[0].split("_")[1]}","${tallyValue._id.student}",${tallyValue.score.toFixed(2)},"${tallyValue.submitted}","${tallyValue.comment}"`;
-    });
+    tallyValues
+      .filter(tallyValue => tallyValue._id.class === classString)
+      .forEach(tallyValue => {
+        const comment = tallyValue.comments.length > 0
+          ? tallyValue.comments[0].comment
+            .replaceAll("\n", " ")
+            .replaceAll(/\s\s+/g, " ")
+          : "N/A";
 
-    document.getElementById("req-scoring-byclass").innerHTML +=
-      `<a 
-                class="btn btn-secondary"
-                href=${URL.createObjectURL(new Blob([tallyScoreCSV], { type: "text/csv" }))}
-                download="PeerEvaluations-${classString}-${(new Date()).toISOString()}.csv"
-            >
-                Export Scoring for ${classString}
-            </a>`;
+        const submitted = tallyValue.scores.length > 0 ? "Y" : "N";
+
+        const nameParts = tallyValue._id.student.split("@")[0].split("_");
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts[1] || "";
+
+        classCSV += `\n"${tallyValue._id.class}","${tallyValue._id.group}","${firstName}","${lastName}","${tallyValue._id.student}",${tallyValue.score.toFixed(2)},"${submitted}","${comment}"`;
+      });
+
+    const classExportLink = document.createElement("a");
+
+    classExportLink.className = "btn btn-secondary";
+    classExportLink.href = URL.createObjectURL(
+      new Blob([classCSV], { type: "text/csv" })
+    );
+    classExportLink.download =
+      `PeerEvaluations-${classString}-${new Date().toISOString()}.csv`;
+    classExportLink.innerText = `Export Scoring for ${classString}`;
+
+    document
+      .getElementById("req-scoring-byclass")
+      .appendChild(classExportLink);
   });
 
   const deleteData = document.getElementById("delete-scoring-data");
