@@ -10,13 +10,14 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-app.use(express.static(path.join(__dirname, "..")));
+app.use(express.static(path.join(__dirname, "public")));
 
 const client = new MongoClient(process.env.MONGO_URI);
 
 let scores;
 let comments;
 
+// Get scoring-page data
 app.get("/api/scoring", async (req, res) => {
   try {
     const tallyValues = await scores.aggregate([
